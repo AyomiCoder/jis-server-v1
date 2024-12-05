@@ -67,7 +67,7 @@ exports.login = async (req, res) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { id: user._id, email: user.email },
+      { userId: user._id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
@@ -77,3 +77,24 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Internal server error', error });
   }
 };
+
+//Get User Details
+exports.getUserDetails = async (req, res) => {
+  try {
+    // Use the user ID from the decoded token in the middleware
+    const user = await User.findById(req.user.userId).select('-password');
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.status(200).json({
+      message: 'User details retrieved successfully',
+      user,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+
