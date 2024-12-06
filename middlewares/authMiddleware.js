@@ -8,9 +8,12 @@ exports.authenticate = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded;
+    // console.log('Token decoded:', decoded);  
+    req.user = decoded; // Make sure we set req.user correctly
+    // console.log('Authenticated User in Middleware:', req.user);  
     next();
   } catch (error) {
+    console.error('Token verification error:', error);  // Log any errors in token verification
     res.status(403).json({ message: 'Invalid token' });
   }
 };

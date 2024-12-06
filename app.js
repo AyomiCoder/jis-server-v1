@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
-// const orderRoutes = require('./routes/orderRoutes');
+const orderRoutes = require('./routes/orderRoutes');
 // const customerRoutes = require('./routes/customerRoutes');
 // const reportRoutes = require('./routes/reportRoutes');
 // const contactRoutes = require('./routes/contactRoutes');
@@ -21,7 +21,7 @@ app.use(bodyParser.json());
 
 // API Routes
 app.use('/api/auth', authRoutes);
-// app.use('/api/orders', orderRoutes);
+app.use('/api/orders', orderRoutes);
 // app.use('/api/customers', customerRoutes);
 // app.use('/api/reports', reportRoutes);
 // app.use('/api/contact', contactRoutes);
