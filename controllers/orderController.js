@@ -29,7 +29,7 @@ exports.createOrder = async (req, res) => {
     }
 
     // Log for debugging to check the incoming request
-    // console.log('Order Data:', req.body);
+    // console.log('Order Data:', req.body); 
 
     // Format the current date and time automatically
     const formattedDate = formatDate(new Date());
@@ -147,4 +147,142 @@ exports.deleteOrder = async (req, res) => {
       res.status(500).json({ message: 'Server error' });
     }
   };
+
+
+  // Generate a PDF for an individual order invoice
+  exports.generateOrderInvoice = async (req, res) => {
+    const { orderId } = req.params;
+  
+    try {
+      // Fetch the order along with the customer information
+      const order = await Order.findOne({ orderId, user: req.user.userId })
+        .populate('customer') // Populate the customer details
+        .populate('user', 'businessName'); // Populate the business name from the User model
+  
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+  
+      // Calculate the total amount for the order
+      const totalAmount = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  
+      // Construct the data object for the invoice
+      const data = {
+        business: {
+          name: order.user.businessName
+        },
+        order: {
+          orderId: order.orderId,
+          date: formatDate(order.date),  // Assuming formatDate is a utility function
+          status: order.status,
+          customer: {
+            name: order.customerName,
+            phone: order.customerPhone,
+            address: order.customerAddress,
+          },
+          items: order.items.map((item) => ({
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+          })),
+          totalAmount,
+        },
+      };
+  
+      // Send the response with the invoice data
+      res.status(200).json(data);
+    } catch (error) {
+      console.error("Error fetching invoice data:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  };
+  
+
+// Generate a PDF report for all orders
+exports.generateOrdersReport = async (req, res) => {
+  try {
+    const orders = await Order.find({ user: req.user.userId }).populate('customer');
+
+    const reportData = orders.map(order => ({
+      orderId: order.orderId,
+      date: formatDate(order.date),
+      customerName: order.customerName,
+      customerPhone: order.customerPhone,
+      customerAddress: order.customerAddress,
+      status: order.status,
+      items: order.items.map(item => ({
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.quantity * item.price,
+      })),
+      totalAmount: order.items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    }));
+
+    res.status(200).json({ orders: reportData });
+  } catch (error) {
+    console.error("Error fetching orders report data:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+// Calculate transactional totals
+exports.getTransactionTotals = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Aggregate totals for Paid, Pending, and Failed orders
+    const totals = await Order.aggregate([
+      { $match: { user: userId } },
+      {
+        $group: {
+          _id: '$status',
+          totalAmount: { $sum: '$items.totalPrice' }, // Assuming each item has a 'totalPrice' field
+        },
+      },
+    ]);
+
+    // Map the results into a more user-friendly format
+    const response = {
+      paidTotal: totals.find((t) => t._id === 'paid')?.totalAmount || 0,
+      pendingTotal: totals.find((t) => t._id === 'pending')?.totalAmount || 0,
+      failedTotal: totals.find((t) => t._id === 'failed')?.totalAmount || 0,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error calculating transaction totals:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get order counts by status
+exports.getOrderCounts = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+
+    // Aggregate counts for Paid, Pending, and Failed orders
+    const counts = await Order.aggregate([
+      { $match: { user: userId } },
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Map the results into a more user-friendly format
+    const response = {
+      paidCount: counts.find((c) => c._id === 'paid')?.count || 0,
+      pendingCount: counts.find((c) => c._id === 'pending')?.count || 0,
+      failedCount: counts.find((c) => c._id === 'failed')?.count || 0,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error fetching order counts:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
    
