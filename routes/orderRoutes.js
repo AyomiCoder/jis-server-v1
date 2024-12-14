@@ -18,7 +18,7 @@ router.post('/create-orders', authenticate, createOrder);
 // Get Orders for the authenticated user (requires authentication)
 router.get('/get-orders', authenticate, getOrders);
 
-// Update Order Status (requires authentication
+// Update Order Status (requires authentication)
 router.put('/status', authenticate, updateOrderStatus);
 
 // Delete Order (requires authentication)
@@ -33,7 +33,7 @@ router.get('/report', authenticate, generateOrdersReport);
 // Get transactional totals (Paid, Pending, Failed) (requires authentication)
 router.get('/transaction-totals', authenticate, getTransactionTotals);
 
-// Get order counts by status (requires authentication)
+// Get order counts by status (requires authenticationn
 router.get('/order-counts', authenticate, getOrderCounts);
 
 module.exports = router;
