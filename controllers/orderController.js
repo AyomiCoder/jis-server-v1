@@ -1,6 +1,6 @@
+// controllers/OrderController.js
 const Order = require('../models/Order');
 const Customer = require('../models/Customer');
-const OrderCounter = require('../models/OrderCounter');
 const mongoose = require('mongoose');
 
 // Helper function to format the dates
@@ -17,7 +17,16 @@ const formatDate = (date) => {
   return new Date(date).toLocaleString('en-US', options);
 };
 
-// Create Order
+// Helper function to generate random orderId
+const generateRandomOrderId = async () => {
+  const randomId = Math.floor(1000000000 + Math.random() * 9000000000); // Generates a 10-digit number
+  const existingOrder = await Order.findOne({ orderId: randomId });
+  if (existingOrder) {
+    return generateRandomOrderId(); // Recursively generate if duplicate exists
+  }
+  return randomId.toString();
+};
+
 // Create Order
 exports.createOrder = async (req, res) => {
   const session = await mongoose.startSession(); // Start a session for transaction
@@ -50,31 +59,8 @@ exports.createOrder = async (req, res) => {
       await customer.save({ session }); // Save within the transaction
     }
 
-    // Atomically find and update the order counter
-    let orderCounter = await OrderCounter.findOneAndUpdate(
-      {}, // Match any document
-      { $inc: { counter: 1 } }, // Increment counter
-      { new: true, upsert: true, session } // Create if not exists
-    );
-
-    // If the counter starts from zero, reset it to 1
-    if (orderCounter.counter === 0) {
-      orderCounter.counter = 1;
-      await orderCounter.save({ session }); // Save to fix if counter was initialized as 0
-    }
-
-    // Generate new order ID based on the counter
-    let newOrderId = `ORD-${orderCounter.counter}`;
-
-    // Ensure uniqueness of the new orderId by checking the Order collection
-    let orderExists = await Order.findOne({ orderId: newOrderId }).session(session);
-    while (orderExists) {
-      // If orderId exists, increment the counter and regenerate the orderId
-      orderCounter.counter += 1;
-      await orderCounter.save({ session });
-      newOrderId = `ORD-${orderCounter.counter}`;
-      orderExists = await Order.findOne({ orderId: newOrderId }).session(session);
-    }
+    // Generate random orderId
+    const newOrderId = await generateRandomOrderId();
 
     // Create new order
     const newOrder = new Order({
@@ -98,7 +84,7 @@ exports.createOrder = async (req, res) => {
 
     res.status(201).json({ message: 'Order created successfully', order: newOrder });
   } catch (error) {
-    await session.abortTransaction(); // Rollback transaction if there's an errors     
+    await session.abortTransaction(); // Rollback transaction if there's an error
     session.endSession();
     console.error('Error creating order:', error.message || error);
     res.status(500).json({ message: 'Server error', error: error.message });
@@ -107,7 +93,7 @@ exports.createOrder = async (req, res) => {
 
 
  
-// Fetch all orders for the authenticated users 
+// Fetch all orders for the authenticated user
 exports.getOrders = async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user.userId }).populate('customer');
@@ -138,7 +124,6 @@ exports.updateOrderStatus = async (req, res) => {
     // Update the status
     order.status = status;
     await order.save();
-
     res.status(200).json({ message: 'Order status updated', order });
   } catch (error) {
     console.error('Error updating order status:', error);
@@ -165,24 +150,6 @@ exports.deleteOrder = async (req, res) => {
 
     // Delete the order
     await Order.deleteOne({ orderId });
-
-    // Adjust the order IDs for all remaining orders
-    const remainingOrders = await Order.find({ user: order.user }).sort({ date: 1 }); // Sort by date
-    let counter = 1;
-
-    for (let remainingOrder of remainingOrders) {
-      // Update the orderId to match the new counter
-      remainingOrder.orderId = `ORD-${counter}`;
-      counter++;
-      await remainingOrder.save();
-    }
-
-    // Update the counter in the OrderCounter model
-    const orderCounter = await OrderCounter.findOne();
-    if (orderCounter) {
-      orderCounter.counter = remainingOrders.length; // Update counter to match remaining orders
-      await orderCounter.save();
-    }
 
     res.status(200).json({ message: 'Order deleted successfully.' });
   } catch (error) {
@@ -215,7 +182,7 @@ exports.generateOrderInvoice = async (req, res) => {
       },
       order: {
         orderId: order.orderId,
-        date: formatDate(order.date),  // Assuming formatDate is a utility function
+        date: formatDate(order.date),
         status: order.status,
         customer: {
           name: order.customerName,
@@ -293,36 +260,6 @@ exports.getTransactionTotals = async (req, res) => {
     res.status(200).json(response);
   } catch (error) {
     console.error('Error calculating transaction totals:', error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-// Get order counts by status
-exports.getOrderCounts = async (req, res) => {
-  try {
-    const userId = req.user.userId;
-
-    // Aggregate counts for Paid, Pending, and Failed orders
-    const counts = await Order.aggregate([
-      { $match: { user: userId } },
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 },
-        },
-      },
-    ]);
-
-    // Map the results into a more user-friendly formats
-    const response = {
-      paidCount: counts.find((c) => c._id === 'paid')?.count || 0,
-      pendingCount: counts.find((c) => c._id === 'pending')?.count || 0,
-      failedCount: counts.find((c) => c._id === 'failed')?.count || 0,
-    };
-
-    res.status(200).json(response);
-  } catch (error) {
-    console.error('Error fetching order counts:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

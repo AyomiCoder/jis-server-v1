@@ -8,8 +8,7 @@ const {
     deleteOrder, 
     generateOrderInvoice, 
     generateOrdersReport, 
-    getTransactionTotals, 
-    getOrderCounts
+    getTransactionTotals
     } = require('../controllers/orderController');
 
 // Create Order (requires authentication)
@@ -32,8 +31,5 @@ router.get('/report', authenticate, generateOrdersReport);
 
 // Get transactional totals (Paid, Pending, Failed) (requires authentication)
 router.get('/transaction-totals', authenticate, getTransactionTotals);
-
-// Get order counts by status (requires authenticationn
-router.get('/order-counts', authenticate, getOrderCounts);
 
 module.exports = router;
