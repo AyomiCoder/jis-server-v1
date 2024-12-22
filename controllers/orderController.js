@@ -19,13 +19,15 @@ const formatDate = (date) => {
 
 // Helper function to generate random orderId
 const generateRandomOrderId = async () => {
-  const randomId = Math.floor(1000000000 + Math.random() * 9000000000); // Generates a 10-digit number
-  const existingOrder = await Order.findOne({ orderId: randomId });
+  const randomId = Math.floor(100000 + Math.random() * 900000); // Generates a 6-digit random number
+  const orderId = `ORD#${randomId}`; // Format the orderId
+
+  const existingOrder = await Order.findOne({ orderId });
   if (existingOrder) {
     return generateRandomOrderId(); // Recursively generate if duplicate exists
   }
-  return randomId.toString();
-};
+  return orderId;
+}; 
 
 // Create Order
 exports.createOrder = async (req, res) => {
@@ -239,18 +241,20 @@ exports.getTransactionTotals = async (req, res) => {
   try {
     const userId = req.user.userId;
 
+    
     // Aggregate totals for Paid, Pending, and Failed orders
     const totals = await Order.aggregate([
-      { $match: { user: userId } },
+      { $match: { user: new mongoose.Types.ObjectId(userId) } },
+      { $unwind: '$items' },
       {
         $group: {
           _id: '$status',
-          totalAmount: { $sum: '$items.totalPrice' }, // Assuming each item has a 'totalPrice' field
+          totalAmount: { $sum: { $multiply: ['$items.quantity', '$items.price'] } },
         },
       },
     ]);
 
-    // Map the results into a more user-friendly format
+    // Map the results into a more user-friendly format 
     const response = {
       paidTotal: totals.find((t) => t._id === 'paid')?.totalAmount || 0,
       pendingTotal: totals.find((t) => t._id === 'pending')?.totalAmount || 0,
