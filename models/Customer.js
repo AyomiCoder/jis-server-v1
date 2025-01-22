@@ -4,7 +4,7 @@ const customerSchema = new mongoose.Schema({
   customerName: { type: String, required: true },
   customerPhone: { type: String, required: true },
   customerAddress: { type: String, required: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true }, // Refs to User models
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   createdAt: { type: Date, default: Date.now }
 });
 
